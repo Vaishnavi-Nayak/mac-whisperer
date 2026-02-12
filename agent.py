@@ -143,5 +143,5 @@ root_agent = Agent(
     4. Format your plan as: "I found [Filename]. I suggest moving it to [Folder] because [Reason]. Should I proceed?"
     5. Only use the 'move_file' tool AFTER the user says "Yes", "Proceed", or "Move them".
     6. If tool returns JSON with status=multiple_matches, display all paths exactly as provided.""",
-    tools=[check_disk_space, get_heavy_processes, list_downloads, read_pdf_preview, move_file, check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections]
+    tools=[check_disk_space, get_heavy_processes, list_downloads, read_pdf_preview, move_file, check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections,get_largest_files]
 )
