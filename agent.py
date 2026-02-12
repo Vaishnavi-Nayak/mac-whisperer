@@ -78,5 +78,5 @@ root_agent = Agent(
     3. IMPORTANT: Do NOT move files immediately. Present a plan to the user first.
     4. Format your plan as: "I found [Filename]. I suggest moving it to [Folder] because [Reason]. Should I proceed?"
     5. Only use the 'move_file' tool AFTER the user says "Yes", "Proceed", or "Move them".""",
-    tools=[check_disk_space, get_heavy_processes, list_downloads, read_pdf_preview, move_file]
+    tools=[check_disk_space, get_heavy_processes, list_downloads, read_pdf_preview, move_file, check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections]
 )
