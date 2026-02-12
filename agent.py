@@ -1,5 +1,38 @@
 import subprocess
 from google.adk import Agent
+import subprocess
+import os
+
+def resolve_folder_path(folder_path: str):
+    """
+    Resolves a folder name or path.
+    Returns:
+        - A valid absolute path (str) if found
+        - A dict with 'multiple_matches'
+        - A dict with 'error'
+    """
+
+    folder_path = os.path.expanduser(folder_path)
+
+    # If full valid path
+    if os.path.isdir(folder_path):
+        return folder_path
+
+    home_dir = os.path.expanduser("~")
+    matches = []
+
+    for root, dirs, _ in os.walk(home_dir):
+        for d in dirs:
+            if d.lower() == folder_path.lower():
+                matches.append(os.path.join(root, d))
+
+    if len(matches) == 1:
+        return matches[0]
+
+    if len(matches) > 1:
+        return {"multiple_matches": matches[:3]}  # Limit to first 5 matches for brevity
+
+    return {"error": f"No folder found matching '{folder_path}'"}
 
 def check_disk_space():
     """Returns the current disk usage of the MacBook."""
@@ -10,6 +43,40 @@ def check_memory_usage():
     """Returns current memory usage statistics."""
     result = subprocess.run(['vm_stat'], capture_output=True, text=True)
     return result.stdout
+
+def get_largest_files(folder_path: str) -> str:
+    """
+    Finds largest files inside a folder.
+    The folder_name can be a simple name like 'Documents' or a full path.
+    """
+
+    resolved = resolve_folder_path(folder_path)
+
+    # If it's an error dict
+    if isinstance(resolved, dict):
+        if "multiple_matches" in resolved:
+            paths = "\n".join(resolved["multiple_matches"])
+            return {
+                "status": "multiple_matches",
+                "paths": resolved["multiple_matches"]
+            }
+
+
+
+        if "error" in resolved:
+            return resolved["error"]
+
+    # At this point it's a valid path
+    result = subprocess.run(
+        ['du', '-ah', resolved],
+        capture_output=True,
+        text=True
+    )
+
+    lines = result.stdout.splitlines()
+    lines.sort(reverse=True)
+
+    return "\n".join(lines[:10])
 
 def check_battery_status():
     """Returns the current battery status."""
@@ -41,6 +108,7 @@ root_agent = Agent(
     name="MacWhisperer",
     model="gemini-2.0-flash-lite", # Fast and cheap for local dev
     instruction="""You are a macOS expert. Help the user monitor their system. 
-    Always explain technical stats in a friendly, witty way.""",
-    tools=[check_disk_space, get_heavy_processes,check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections]
+    Always explain technical stats in a friendly, witty way. If tool returns JSON with status=multiple_matches,
+    display all paths exactly as provided.""",
+    tools=[check_disk_space, get_heavy_processes,check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections,get_largest_files]
 )
