@@ -1,7 +1,10 @@
 import subprocess
 from google.adk import Agent
-import subprocess
+
 import os
+import shutil
+import fitz 
+from pathlib import Path
 
 def resolve_folder_path(folder_path: str):
     """
@@ -30,19 +33,9 @@ def resolve_folder_path(folder_path: str):
         return matches[0]
 
     if len(matches) > 1:
-        return {"multiple_matches": matches[:3]}  # Limit to first 5 matches for brevity
+        return {"multiple_matches": matches[:5]}  # Limit to first 5 matches for brevity
 
     return {"error": f"No folder found matching '{folder_path}'"}
-
-def check_disk_space():
-    """Returns the current disk usage of the MacBook."""
-    result = subprocess.run(['df', '-h', '/'], capture_output=True, text=True)
-    return result.stdout
-
-def check_memory_usage():
-    """Returns current memory usage statistics."""
-    result = subprocess.run(['vm_stat'], capture_output=True, text=True)
-    return result.stdout
 
 def get_largest_files(folder_path: str) -> str:
     """
@@ -61,8 +54,6 @@ def get_largest_files(folder_path: str) -> str:
                 "paths": resolved["multiple_matches"]
             }
 
-
-
         if "error" in resolved:
             return resolved["error"]
 
@@ -77,6 +68,42 @@ def get_largest_files(folder_path: str) -> str:
     lines.sort(reverse=True)
 
     return "\n".join(lines[:10])
+
+
+def read_pdf_preview(file_path: str) -> str:
+    """Reads the first 500 characters of a PDF to identify its contents."""
+    try:
+        with fitz.open(file_path) as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()
+                if len(text) > 500: break
+            return text[:500]
+    except Exception as e:
+        return f"Error reading PDF: {e}"
+
+def move_file(source: str, destination_folder: str):
+    """Moves a file to a specific folder. Creates the folder if it doesn't exist."""
+    src_path = Path(source)
+    dest_path = Path(destination_folder)
+    dest_path.mkdir(parents=True, exist_ok=True)
+    shutil.move(src_path, dest_path / src_path.name)
+    return f"Successfully moved {src_path.name} to {destination_folder}"
+
+def list_downloads():
+    """Lists files in the Downloads folder."""
+    downloads = Path.home() / "Downloads"
+    return [str(f) for f in downloads.iterdir() if f.is_file() and not f.name.startswith('.')]
+
+def check_disk_space():
+    """Returns the current disk usage of the MacBook."""
+    result = subprocess.run(['df', '-h', '/'], capture_output=True, text=True)
+    return result.stdout
+
+def check_memory_usage():
+    """Returns current memory usage statistics."""
+    result = subprocess.run(['vm_stat'], capture_output=True, text=True)
+    return result.stdout
 
 def check_battery_status():
     """Returns the current battery status."""
@@ -108,7 +135,13 @@ root_agent = Agent(
     name="MacWhisperer",
     model="gemini-2.0-flash-lite", # Fast and cheap for local dev
     instruction="""You are a macOS expert. Help the user monitor their system. 
-    Always explain technical stats in a friendly, witty way. If tool returns JSON with status=multiple_matches,
-    display all paths exactly as provided.""",
-    tools=[check_disk_space, get_heavy_processes,check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections,get_largest_files]
+    Always explain technical stats in a friendly, witty way.
+    Also, help the user manage their Downloads folder. If you find large files, suggest moving them to appropriate folders based on their content.
+    1. Scan the Downloads folder using 'list_downloads'.
+    2. Analyze the contents. If it's a PDF, use 'read_pdf_preview'.
+    3. IMPORTANT: Do NOT move files immediately. Present a plan to the user first.
+    4. Format your plan as: "I found [Filename]. I suggest moving it to [Folder] because [Reason]. Should I proceed?"
+    5. Only use the 'move_file' tool AFTER the user says "Yes", "Proceed", or "Move them".
+    6. If tool returns JSON with status=multiple_matches, display all paths exactly as provided.""",
+    tools=[check_disk_space, get_heavy_processes, list_downloads, read_pdf_preview, move_file, check_memory_usage, check_battery_status, list_network_interfaces, check_uptime, show_network_connections]
 )
